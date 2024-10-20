@@ -109,20 +109,17 @@ nextprice/
 
 ---
 
-## 📸 Screenshots
+## 📸 Screenshots!
 
 ### Cost of Living Predictor (Tab 1):
+![Screenshot 2024-10-20 060803](https://github.com/user-attachments/assets/d7546190-5df6-474d-ae4b-997b2d9e6c5b)
 
-*Include a screenshot of the cost of living prediction tab here.*
+
 
 ### Relative Inflation Comparison (Tab 2):
+![Screenshot 2024-10-20 061041](https://github.com/user-attachments/assets/53311ffe-45ba-4b97-a768-1ca0f5cd0f3d)
 
-*Include a screenshot of the relative inflation comparison tab here.*
-
----
 
 ## 📝 License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
-
----
