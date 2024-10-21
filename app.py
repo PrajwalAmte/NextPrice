@@ -1,12 +1,12 @@
 import pandas as pd
 import numpy as np
-from sklearn.linear_model import LinearRegression
 import streamlit as st
 import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error
 
 # Load the dataset
 df = pd.read_csv('global_inflation_data.csv')
-
 
 # Function to prepare data for a specific country
 def prepare_country_data(df, country):
@@ -21,34 +21,48 @@ def prepare_country_data(df, country):
 
     return inflation_data
 
-
-# Function to train a linear regression model and predict inflation
-def predict_inflation(df, country, year_range):
+# Function to train a Random Forest model and predict inflation
+def predict_inflation_rf(df, country, year_range):
     inflation_data = prepare_country_data(df, country)
 
-    # Train a linear regression model
-    X = inflation_data[['Year']]  # Feature: Year
-    y = inflation_data['Inflation']  # Target: Inflation rate
+    # Prepare data for Random Forest
+    X = inflation_data[['Year']].astype(int)  # Feature: Year
+    y = inflation_data['Inflation'].astype(float)  # Target: Inflation rate
 
-    model = LinearRegression()
-    model.fit(X, y)
+    # Split the data into train and test sets
+    train_size = int(0.8 * len(X))  # Using 80% for training and 20% for testing
+    X_train, X_test = X[:train_size], X[train_size:]
+    y_train, y_test = y[:train_size], y[train_size:]
 
-    # Predict inflation for the range of years
+    # Train the Random Forest model
+    rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
+    rf_model.fit(X_train, y_train)
+
+    # Predict future inflation
     future_years = np.array(year_range).reshape(-1, 1)
-    predictions = model.predict(future_years)
+    predictions = rf_model.predict(future_years)
 
-    return predictions, inflation_data
+    # Calculate accuracy metrics for the training set
+    y_pred_train = rf_model.predict(X_train)
+    mse_train = mean_squared_error(y_train, y_pred_train)
+    accuracy_train = 100 * (1 - mse_train / np.var(y_train))
 
+    # Calculate accuracy metrics for the test set
+    y_pred_test = rf_model.predict(X_test)
+    mse_test = mean_squared_error(y_test, y_pred_test)
+    accuracy_test = 100 * (1 - mse_test / np.var(y_test))
+
+    return predictions, inflation_data, mse_train, accuracy_train, mse_test, accuracy_test
 
 # Streamlit UI with Tabs
-st.title("NextPrice")
+st.title("Cost of Living Prediction Tool")
 
 # Creating two tabs: one for the first project and another for the second project
-tab1, tab2 = st.tabs(["Cost of Living Prediction", "Relative Inflation Between Countries"])
+tab1, tab2 = st.tabs(["Same Country Prediction", "Relative Inflation Between Countries"])
 
 # First Tab: Predicting cost of living in the same country over different years
 with tab1:
-    st.header("Cost of Living Prediction")
+    st.header("Cost of Living Prediction (Same Country)")
 
     # User inputs
     country = st.text_input("Enter the country:")
@@ -60,7 +74,13 @@ with tab1:
         if country and current_cost > 0:
             # Get inflation predictions for current and future years
             years_range = list(range(current_year, future_year + 1))
-            future_inflation, inflation_data = predict_inflation(df, country, years_range)
+            future_inflation, inflation_data, mse_train, acc_train, mse_test, acc_test = predict_inflation_rf(df, country, years_range)
+
+            # Display MSE and Accuracy
+            st.write(f"Mean Squared Error (Train Set): {mse_train:.2f}")
+            st.write(f"Accuracy Percentage (Train Set): {acc_train:.2f}%")
+            st.write(f"Mean Squared Error (Test Set): {mse_test:.2f}")
+            st.write(f"Accuracy Percentage (Test Set): {acc_test:.2f}%")
 
             # Calculate the number of years between current and future year
             num_years = future_year - current_year
@@ -71,8 +91,7 @@ with tab1:
             # Display results
             st.write(f"Predicted inflation in {country} for {current_year} is: {future_inflation[0]:.2f}%")
             st.write(f"Predicted inflation in {country} for {future_year} is: {future_inflation[-1]:.2f}%")
-            st.write(
-                f"Your projected cost of living in {country} for {future_year} is: {projected_cost:.2f} (from {current_cost:.2f})")
+            st.write(f"Your projected cost of living in {country} for {future_year} is: {projected_cost:.2f} (from {current_cost:.2f})")
 
             # Plotting historical inflation data
             plt.figure(figsize=(10, 5))
@@ -105,28 +124,23 @@ with tab2:
         if current_country and future_country:
             # Get inflation predictions for both countries over the range of years
             years_range = list(range(current_year, future_year + 1))
-            current_country_inflation, _ = predict_inflation(df, current_country, years_range)
-            future_country_inflation, _ = predict_inflation(df, future_country, years_range)
+            current_country_inflation, _, _, _, _, _ = predict_inflation_rf(df, current_country, years_range)
+            future_country_inflation, _, _, _, _, _ = predict_inflation_rf(df, future_country, years_range)
 
             # Calculate relative inflation for each year in the range
             relative_inflation = future_country_inflation - current_country_inflation
 
             # Display results
-            st.write(
-                f"Predicted inflation in {current_country} for {future_year} is: {current_country_inflation[-1]:.2f}%")
-            st.write(
-                f"Predicted inflation in {future_country} for {future_year} is: {future_country_inflation[-1]:.2f}%")
-            st.write(
-                f"Relative inflation (Future Country - Current Country) for {future_year} is: {relative_inflation[-1]:.2f}%")
+            st.write(f"Predicted inflation in {current_country} for {future_year} is: {current_country_inflation[-1]:.2f}%")
+            st.write(f"Predicted inflation in {future_country} for {future_year} is: {future_country_inflation[-1]:.2f}%")
+            st.write(f"Relative inflation (Future Country - Current Country) for {future_year} is: {relative_inflation[-1]:.2f}%")
 
             # Plot relative inflation trend over the years
             plt.figure(figsize=(10, 5))
 
             # Plot the relative inflation trend, using color to show positive and negative differences
-            plt.fill_between(years_range, relative_inflation, 0, where=(relative_inflation > 0), color='green',
-                             alpha=0.6, label='Positive Difference')
-            plt.fill_between(years_range, relative_inflation, 0, where=(relative_inflation < 0), color='red', alpha=0.6,
-                             label='Negative Difference')
+            plt.fill_between(years_range, relative_inflation, 0, where=(relative_inflation > 0), color='green', alpha=0.6, label='Positive Difference')
+            plt.fill_between(years_range, relative_inflation, 0, where=(relative_inflation < 0), color='red', alpha=0.6, label='Negative Difference')
             plt.plot(years_range, relative_inflation, marker='o', color='purple', label='Relative Inflation Trend')
 
             plt.title('Relative Inflation Trend Between Countries')
